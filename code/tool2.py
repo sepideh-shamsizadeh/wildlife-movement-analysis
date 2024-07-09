@@ -1,58 +1,91 @@
 import asyncio
 import websockets
+import json
 import numpy as np
-import matplotlib.pyplot as plt
+import joblib
 import argparse
+import matplotlib.pyplot as plt
 
-# Parse command line arguments
-parser = argparse.ArgumentParser(description='Process animal movement data.')
-parser.add_argument('--duration', type=int, default=3000, help='Total duration to listen for data (seconds)')
-args = parser.parse_args()
+# Constants
+REFERENCE_LAT = 47.0  # degrees
+REFERENCE_LON = 8.0  # degrees
+METERS_PER_DEGREE_LAT = 111320  # Approx value, varies with latitude
+METERS_PER_DEGREE_LON = 111320 * np.cos(np.radians(REFERENCE_LAT))  # Adjusted for latitude
 
-animal_positions = {}
-log_file = open("animal_positions.log", "w")
+def haversine_distance(lat1, lon1, lat2, lon2):
+    R = 6371e3  # Earth's radius in meters
+    phi1 = np.radians(lat1)
+    phi2 = np.radians(lat2)
+    delta_phi = np.radians(lat2 - lat1)
+    delta_lambda = np.radians(lon2 - lon1)
+    
+    a = np.sin(delta_phi / 2) ** 2 + np.cos(phi1) * np.cos(phi2) * np.sin(delta_lambda / 2) ** 2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    
+    return R * c
 
-async def process_data():
+async def read_data_stream():
     uri = "ws://localhost:8765"
-    end_time = asyncio.get_event_loop().time() + args.duration
     async with websockets.connect(uri) as websocket:
-        while asyncio.get_event_loop().time() < end_time:
+        while True:
             try:
                 data = await websocket.recv()
-                animal_id, lat, lon = map(float, data.split(','))
-                log_file.write(f"{animal_id},{lat},{lon}\n")
-                if animal_id not in animal_positions:
-                    animal_positions[animal_id] = []
-                animal_positions[animal_id].append((lat, lon))
+                yield json.loads(data)
+            except websockets.ConnectionClosed:
+                break
 
-                # Calculate metrics (example: average distance traveled)
-                total_distance = 0
-                count = 0
-                for positions in animal_positions.values():
-                    if len(positions) > 1:
-                        for i in range(1, len(positions)):
-                            prev_lat, prev_lon = positions[i - 1]
-                            curr_lat, curr_lon = positions[i]
-                            distance = np.sqrt((curr_lat - prev_lat) ** 2 + (curr_lon - prev_lon) ** 2)
-                            total_distance += distance
-                            count += 1
-                if count > 0:
-                    average_distance = total_distance / count
-                    print(f"Average Distance Traveled: {average_distance:.6f}")
-            except (websockets.exceptions.ConnectionClosedError, websockets.exceptions.InvalidStatusCode) as e:
-                print(f"Connection error: {e}. Retrying...")
-                await asyncio.sleep(1)  # Wait a bit before retrying
+async def calculate_metrics_and_detect_anomalies(model):
+    distances = {}
+    counts = {}
+    anomaly_points = []
 
-    # Plot positions after the specified duration
-    plt.figure(figsize=(10, 6))
-    for animal_id, positions in animal_positions.items():
-        lats, lons = zip(*positions)
-        plt.plot(lons, lats, marker='o', label=f"Animal {animal_id}")
-    plt.title('Animal Movements')
+    async for row in read_data_stream():
+        animal_id = int(row['animal_id'])
+        lat = float(row['lat'])
+        lon = float(row['lon'])
+
+        # Calculate distance traveled
+        if animal_id in distances:
+            prev_lat, prev_lon = distances[animal_id]
+            distance = haversine_distance(prev_lat, prev_lon, lat, lon)
+            distances[animal_id] = (lat, lon)
+            counts[animal_id].append(distance)
+        else:
+            distances[animal_id] = (lat, lon)
+            counts[animal_id] = []
+
+        avg_distances = {aid: sum(dists) / len(dists) if dists else 0 for aid, dists in counts.items()}
+        print(f"Average distances: {avg_distances}")
+
+        # Detect anomalies using the GMM model
+        anomaly_score = model.score_samples([[lat, lon]])[0]
+        is_anomalous = anomaly_score < -10  # Example threshold, adjust based on historic data
+        print(f"Animal ID: {animal_id}, Anomalous: {is_anomalous}, Anomaly Score: {anomaly_score}")
+
+        if is_anomalous:
+            anomaly_points.append((lat, lon))
+
+    # Plot real-time data and anomalies
+    latitudes = [coords[0] for coords in distances.values()]
+    longitudes = [coords[1] for coords in distances.values()]
+    
+    plt.scatter(longitudes, latitudes, s=1, label='Animal Positions')
+    
+    if anomaly_points:
+        anomaly_lats = [point[0] for point in anomaly_points]
+        anomaly_lons = [point[1] for point in anomaly_points]
+        plt.scatter(anomaly_lons, anomaly_lats, color='red', s=5, label='Anomalies')
+
+    plt.title('Animal Positions and Anomalies')
     plt.xlabel('Longitude')
     plt.ylabel('Latitude')
     plt.legend()
     plt.show()
 
-asyncio.run(process_data())
-log_file.close()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Process animal movement data.')
+    parser.add_argument('--model_file', type=str, default='gmm_model.pkl', help='File to load the GMM model')
+    args = parser.parse_args()
+
+    model = joblib.load(args.model_file)
+    asyncio.run(calculate_metrics_and_detect_anomalies(model))

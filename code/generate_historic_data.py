@@ -2,13 +2,13 @@ import asyncio
 import random
 import numpy as np
 import argparse
-import websockets
-import json
+import csv
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='Simulate animal movements.')
 parser.add_argument('--num_animals', type=int, default=10, help='Number of animals to simulate')
 parser.add_argument('--update_interval', type=float, default=0.25, help='Time interval between updates (seconds)')
+parser.add_argument('--save_data', type=bool, default=False, help='Save data to CSV')
 parser.add_argument('--duration', type=int, default=3000, help='Total duration of the simulation (seconds)')
 args = parser.parse_args()
 
@@ -47,7 +47,7 @@ def xy_to_wgs84(x, y):
     lon = REFERENCE_LON + (x / METERS_PER_DEGREE_LON)
     return lat, lon
 
-async def simulate_animal_movement(animal_id, websocket):
+async def simulate_animal_movement(animal_id, csv_writer, save_data):
     x, y = random.uniform(0, FIELD_WIDTH), random.uniform(0, FIELD_HEIGHT)
     for t in range(NUM_POINTS):
         current_time = t * TIME_STEP
@@ -86,25 +86,23 @@ async def simulate_animal_movement(animal_id, websocket):
         # Convert to WGS84
         lat, lon = xy_to_wgs84(x, y)
         
-        data = {
-            'animal_id': animal_id,
-            'timestamp': current_time,
-            'lat': lat,
-            'lon': lon,
-            'behavior': behavior
-        }
-
-        # Send data to WebSocket
-        await websocket.send(json.dumps(data))
+        # Save data to CSV if save_data is True
+        if save_data:
+            csv_writer.writerow({'animal_id': animal_id, 'timestamp': current_time, 'lat': lat, 'lon': lon, 'behavior': behavior})
         
         await asyncio.sleep(TIME_STEP)
 
-async def handler(websocket, path):
-    tasks = [simulate_animal_movement(animal_id, websocket) for animal_id in range(1, NUM_ANIMALS + 1)]
-    await asyncio.gather(*tasks)
-
 async def main():
-    async with websockets.serve(handler, "localhost", 8765):
-        await asyncio.Future()  # run forever
+    save_data = args.save_data
+    if save_data:
+        with open('animal_movement_data.csv', mode='w', newline='') as csv_file:
+            fieldnames = ['animal_id', 'timestamp', 'lat', 'lon', 'behavior']
+            csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            csv_writer.writeheader()
+            tasks = [simulate_animal_movement(animal_id, csv_writer, save_data) for animal_id in range(1, NUM_ANIMALS + 1)]
+            await asyncio.gather(*tasks)
+    else:
+        tasks = [simulate_animal_movement(animal_id, None, save_data) for animal_id in range(1, NUM_ANIMALS + 1)]
+        await asyncio.gather(*tasks)
 
 asyncio.run(main())
