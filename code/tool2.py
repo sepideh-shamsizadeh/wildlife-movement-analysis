@@ -2,14 +2,21 @@ import asyncio
 import websockets
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Process animal movement data.')
+parser.add_argument('--duration', type=int, default=3000, help='Total duration to listen for data (seconds)')
+args = parser.parse_args()
 
 animal_positions = {}
 log_file = open("animal_positions.log", "w")
 
 async def process_data():
     uri = "ws://localhost:8765"
+    end_time = asyncio.get_event_loop().time() + args.duration
     async with websockets.connect(uri) as websocket:
-        while True:
+        while asyncio.get_event_loop().time() < end_time:
             try:
                 data = await websocket.recv()
                 animal_id, lat, lon = map(float, data.split(','))
@@ -32,21 +39,20 @@ async def process_data():
                 if count > 0:
                     average_distance = total_distance / count
                     print(f"Average Distance Traveled: {average_distance:.6f}")
-
-                # Plot positions
-                if len(animal_positions[animal_id]) % 40 == 0:  # Plot every 40 updates
-                    plt.figure(figsize=(10, 6))
-                    for animal_id, positions in animal_positions.items():
-                        lats, lons = zip(*positions)
-                        plt.plot(lons, lats, marker='o', label=f"Animal {animal_id}")
-                    plt.title('Animal Movements')
-                    plt.xlabel('Longitude')
-                    plt.ylabel('Latitude')
-                    plt.legend()
-                    plt.show()
             except (websockets.exceptions.ConnectionClosedError, websockets.exceptions.InvalidStatusCode) as e:
                 print(f"Connection error: {e}. Retrying...")
                 await asyncio.sleep(1)  # Wait a bit before retrying
+
+    # Plot positions after the specified duration
+    plt.figure(figsize=(10, 6))
+    for animal_id, positions in animal_positions.items():
+        lats, lons = zip(*positions)
+        plt.plot(lons, lats, marker='o', label=f"Animal {animal_id}")
+    plt.title('Animal Movements')
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.legend()
+    plt.show()
 
 asyncio.run(process_data())
 log_file.close()

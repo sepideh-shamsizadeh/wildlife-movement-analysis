@@ -2,14 +2,22 @@ import asyncio
 import random
 import numpy as np
 import websockets
+import argparse
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Simulate animal movements.')
+parser.add_argument('--num_animals', type=int, default=10, help='Number of animals to simulate')
+parser.add_argument('--update_interval', type=float, default=0.25, help='Time interval between updates (seconds)')
+parser.add_argument('--duration', type=int, default=3000, help='Total duration of the simulation (seconds)')
+args = parser.parse_args()
 
 # Constants
 FIELD_WIDTH = 600
 FIELD_HEIGHT = 200
-TIME_STEP = 0.25
-TOTAL_TIME = 3000
+TIME_STEP = args.update_interval
+TOTAL_TIME = args.duration
 NUM_POINTS = int(TOTAL_TIME / TIME_STEP)
-NUM_ANIMALS = 10
+NUM_ANIMALS = args.num_animals
 GPS_NOISE_LEVEL = 1.0
 REFERENCE_LAT = 47.0
 REFERENCE_LON = 8.0
@@ -42,14 +50,14 @@ async def simulate_animal_movement(animal_id, websocket):
         await websocket.send(f"{animal_id},{lat},{lon}")
         await asyncio.sleep(TIME_STEP)
 
-async def main():
-    async with websockets.serve(handler, "localhost", 8765):
-        await asyncio.Future()  # run forever
-
 async def handler(websocket, path):
     tasks = []
     for animal_id in range(1, NUM_ANIMALS + 1):
         tasks.append(simulate_animal_movement(animal_id, websocket))
     await asyncio.gather(*tasks)
+
+async def main():
+    async with websockets.serve(handler, "localhost", 8765):
+        await asyncio.Future()  # run forever
 
 asyncio.run(main())
