@@ -29,8 +29,7 @@ def xy_to_wgs84(x, y):
 def add_gps_noise(x, y, noise_level):
     return x + np.random.normal(0, noise_level), y + np.random.normal(0, noise_level)
 
-async def simulate_animal_movement(websocket, path):
-    animal_id = random.randint(1, 1000)  # Assign a random animal ID for simplicity
+async def simulate_animal_movement(animal_id, websocket):
     x, y = random.uniform(0, FIELD_WIDTH), random.uniform(0, FIELD_HEIGHT)
     for _ in range(NUM_POINTS):
         angle = random.uniform(0, 2 * np.pi)
@@ -44,7 +43,13 @@ async def simulate_animal_movement(websocket, path):
         await asyncio.sleep(TIME_STEP)
 
 async def main():
-    async with websockets.serve(simulate_animal_movement, "localhost", 8765):
+    async with websockets.serve(handler, "localhost", 8765):
         await asyncio.Future()  # run forever
+
+async def handler(websocket, path):
+    tasks = []
+    for animal_id in range(1, NUM_ANIMALS + 1):
+        tasks.append(simulate_animal_movement(animal_id, websocket))
+    await asyncio.gather(*tasks)
 
 asyncio.run(main())
