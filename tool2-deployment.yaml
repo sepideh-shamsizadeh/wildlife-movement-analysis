@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool2-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: tool2
+  template:
+    metadata:
+      labels:
+        app: tool2
+    spec:
+      containers:
+      - name: tool2
+        image: tool2:latest
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+          requests:
+            cpu: "500m"
+            memory: "256Mi"
