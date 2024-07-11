@@ -104,7 +104,7 @@ async def handler(websocket, path):
     await asyncio.gather(*tasks)
 
 async def main():
-    async with websockets.serve(handler, "localhost", 8765):
+    async with websockets.serve(handler, "0.0.0.0", 8765):  # Bind to all network interfaces
         await asyncio.Future()  # run forever
 
 asyncio.run(main())

@@ -4,13 +4,16 @@ import json
 import numpy as np
 import joblib
 import argparse
-import matplotlib.pyplot as plt
+import logging
 
 # Constants
 REFERENCE_LAT = 47.0  # degrees
 REFERENCE_LON = 8.0  # degrees
 METERS_PER_DEGREE_LAT = 111320  # Approx value, varies with latitude
 METERS_PER_DEGREE_LON = 111320 * np.cos(np.radians(REFERENCE_LAT))  # Adjusted for latitude
+
+# Setup logging
+logging.basicConfig(filename='anomaly_detection.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     R = 6371e3  # Earth's radius in meters
@@ -25,7 +28,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 async def read_data_stream():
-    uri = "ws://localhost:8765"
+    uri = "ws://simulator-service:80"  # Use the service name for animal-movement-simulator
     async with websockets.connect(uri) as websocket:
         while True:
             try:
@@ -55,15 +58,14 @@ async def calculate_metrics_and_detect_anomalies(model):
             counts[animal_id] = []
 
         avg_distances = {aid: sum(dists) / len(dists) if dists else 0 for aid, dists in counts.items()}
-        print(f"Average distances: {avg_distances}")
+        logging.info(f"Average distances: {avg_distances}")
 
         # Detect anomalies using the GMM model
         anomaly_score = model.score_samples([[lat, lon]])[0]
         is_anomalous = anomaly_score < -10  # Example threshold, adjust based on historic data
-        print(f"Animal ID: {animal_id}, Anomalous: {is_anomalous}, Anomaly Score: {anomaly_score}")
-
         if is_anomalous:
             anomaly_points.append((lat, lon))
+            logging.warning(f"Animal ID: {animal_id}, Anomalous: {is_anomalous}, Anomaly Score: {anomaly_score}")
 
     # Plot real-time data and anomalies
     latitudes = [coords[0] for coords in distances.values()]
