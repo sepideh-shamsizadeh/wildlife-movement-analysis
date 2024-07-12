@@ -1,76 +1,53 @@
 import asyncio
-import websockets
 import json
-import numpy as np
-import logging
+import os
+import websockets
+from statistics import mean
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+animal_positions = {}
 
-class DataStreamAnalyzer:
-    def __init__(self):
-        self.animal_data = {}
+async def calculate_metrics():
+    while True:
+        await asyncio.sleep(5)  # Metric calculation interval
+        for animal_id, positions in animal_positions.items():
+            if len(positions) > 1:
+                distances = [
+                    haversine(positions[i], positions[i + 1])
+                    for i in range(len(positions) - 1)
+                ]
+                average_distance = mean(distances)
+                print(f"Animal {animal_id} average distance: {average_distance:.2f} meters")
+            else:
+                print(f"Animal {animal_id} has insufficient data")
 
-    def update_metrics(self, cow_id, lat, lon):
-        if cow_id not in self.animal_data:
-            self.animal_data[cow_id] = {
-                "total_distance": 0,
-                "num_positions": 0,
-                "last_position": None
-            }
-        data = self.animal_data[cow_id]
-        if data["last_position"] is not None:
-            last_lat, last_lon = data["last_position"]
-            distance = self.haversine_distance(last_lat, last_lon, lat, lon)
-            data["total_distance"] += distance
-            data["num_positions"] += 1
-        data["last_position"] = (lat, lon)
+def haversine(coord1, coord2):
+    import math
+    lat1, lon1 = coord1
+    lat2, lon2 = coord2
+    R = 6371000  # Radius of Earth in meters
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
-    def average_distance(self, cow_id):
-        data = self.animal_data.get(cow_id)
-        if data is None or data["num_positions"] == 0:
-            return 0
-        return data["total_distance"] / data["num_positions"]
+async def consume_movement_data():
+    server_url = os.getenv('SERVER_URL', 'ws://localhost:5678')
+    async with websockets.connect(server_url) as websocket:
+        async for message in websocket:
+            data = json.loads(message)
+            animal_id = data['cow_id']
+            position = (data['latitude'], data['longitude'])
+            if animal_id not in animal_positions:
+                animal_positions[animal_id] = []
+            animal_positions[animal_id].append(position)
 
-    def haversine_distance(self, lat1, lon1, lat2, lon2):
-        R = 6371000  # Earth radius in meters
-        phi1, phi2 = np.radians(lat1), np.radians(lat2)
-        delta_phi = np.radians(lat2 - lat1)
-        delta_lambda = np.radians(lon2 - lon1)
-        a = np.sin(delta_phi / 2) ** 2 + np.cos(phi1) * np.cos(phi2) * np.sin(delta_lambda / 2) ** 2
-        c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-        return R * c
+async def main():
+    await asyncio.gather(
+        consume_movement_data(),
+        calculate_metrics()
+    )
 
-async def receive_movements():
-    uri = "ws://localhost:5678"
-    analyzer = DataStreamAnalyzer()
-
-    try:
-        async with websockets.connect(uri) as websocket:
-            while True:
-                message = await websocket.recv()
-                data = json.loads(message)
-                cow_id = data.get("cow_id")
-                lat = data.get("latitude")
-                lon = data.get("longitude")
-                
-                if cow_id is not None and lat is not None and lon is not None:
-                    analyzer.update_metrics(cow_id, lat, lon)
-                    logger.info(f"Received data for Cow ID: {cow_id}, Latitude: {lat}, Longitude: {lon}")
-                    logger.info(f"Avg Distance for Cow ID {cow_id}: {analyzer.average_distance(cow_id):.4f} m")
-                else:
-                    logger.warning("Received incomplete data from the server.")
-
-    except websockets.ConnectionClosed:
-        logger.error("Connection to WebSocket server closed.")
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON: {e}")
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-
-def main():
-    asyncio.get_event_loop().run_until_complete(receive_movements())
-
-if __name__ == "__main__":
-    main()
+asyncio.run(main())

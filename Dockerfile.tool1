@@ -1,0 +1,6 @@
+# Dockerfile for tool1
+FROM python:3.9-slim
+WORKDIR /app
+COPY src/tool1.py src/cow_movement_simulator.py requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+CMD ["python", "tool1.py"]

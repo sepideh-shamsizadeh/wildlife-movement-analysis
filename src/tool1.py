@@ -1,63 +1,69 @@
-import unittest
-from unittest.mock import Mock, patch
 import asyncio
 import websockets
 import json
+import os
+import numpy as np
 import matplotlib.pyplot as plt
-from asynctest import TestCase, MagicMock
-from src.tool1 import CowMovementSimulator  # Adjust import based on your project structure
-from src.tool2 import MovementGenerator
+from cow_movement_simulator import CowMovementSimulator
 
+class MovementGenerator:
+    def __init__(self, num_animals):
+        self.simulators = [CowMovementSimulator(cow_id) for cow_id in range(num_animals)]
+        self.trajectories = {simulator.cow_id: [] for simulator in self.simulators}
 
-class TestMovementGenerator(TestCase):
+    async def send_movements(self, websocket, path):
+        while True:
+            for simulator in self.simulators:
+                cow_id, lat, lon = simulator.next_step()
+                self.trajectories[cow_id].append((lat, lon))
+                data = {
+                    "cow_id": cow_id,
+                    "latitude": lat,
+                    "longitude": lon
+                }
+                await websocket.send(json.dumps(data))
+            await asyncio.sleep(simulator.TIME_STEP)  # Sleep for the time step duration
 
-    def setUp(self):
-        self.num_animals = 3
-        self.generator = MovementGenerator(self.num_animals)
+    def plot_trajectories(self):
+        plt.figure(figsize=(14, 8))
+        for cow_id, trajectory in self.trajectories.items():
+            if trajectory:
+                lats, lons = zip(*trajectory)
+                x, y = self.convert_to_meters(lats, lons)
+                x = 600+x
+                y = 0+y
+                plt.plot(x, y, label=f'Cow {cow_id}')
+        plt.title('Animal Movements Over Time')
+        plt.xlabel('Distance (meters)')
+        plt.ylabel('Distance (meters)')
+        plt.xlim(0, 600)
+        plt.ylim(0, 200)
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
-    @patch('src.tool1.CowMovementSimulator')
-    @patch('websockets.serve')
-    def test_send_movements(self, mock_serve, MockCowMovementSimulator):
-        # Mock CowMovementSimulator's next_step method
-        mock_simulators = [MockCowMovementSimulator(cow_id) for cow_id in range(self.num_animals)]
-        for simulator in mock_simulators:
-            simulator.next_step.return_value = (simulator.cow_id, 1.0, 2.0)
+    @staticmethod
+    def convert_to_meters(lats, lons):
+        R = 6371000  # Radius of Earth in meters
+        lats_rad = np.radians(lats)
+        lons_rad = np.radians(lons)
+        lat0 = lats_rad[0]
+        lon0 = lons_rad[0]
+        x = R * (lons_rad - lon0) * np.cos(lat0)
+        y = R * (lats_rad - lat0)
+        return x, y
 
-        # Mock asyncio event loop
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self._test_send_movements(loop, mock_simulators))
+def main():
+    num_animals = int(os.getenv("NUM_ANIMALS", 5))  # Default to 5 if the environment variable is not set
+    generator = MovementGenerator(num_animals)
+    start_server = websockets.serve(generator.send_movements, "0.0.0.0", 5678)
 
-    async def _test_send_movements(self, loop, mock_simulators):
-        mock_websocket = MagicMock()
-        mock_path = '/test_path'
-        await self.generator.send_movements(mock_websocket, mock_path)
+    try:
+        asyncio.get_event_loop().run_until_complete(start_server)
+        asyncio.get_event_loop().run_forever()
+    except KeyboardInterrupt:
+        # When interrupted, plot the trajectories
+        generator.plot_trajectories()
 
-        # Check if send method of websocket is called with correct data
-        expected_data = {
-            "cow_id": 0,  # Assuming cow_id starts from 0
-            "latitude": 1.0,
-            "longitude": 2.0
-        }
-        mock_websocket.send.assert_called_with(json.dumps(expected_data))
-
-        # Check if trajectories are updated
-        for simulator in mock_simulators:
-            self.assertIn((1.0, 2.0), self.generator.trajectories[simulator.cow_id])
-
-    def test_plot_trajectories(self):
-        # Populate trajectories for testing
-        self.generator.trajectories = {
-            0: [(1.0, 2.0), (2.0, 3.0)],
-            1: [(0.5, 1.5), (1.5, 2.5)],
-            2: [(2.0, 3.0), (3.0, 4.0)]
-        }
-
-        # Mock matplotlib's plot method
-        with patch('matplotlib.pyplot.show'):
-            self.generator.plot_trajectories()
-
-            # You can add more assertions here to check the plot, e.g., plot title, labels, etc.
-
-if __name__ == '__main__':
-    unittest.main()
-
+if __name__ == "__main__":
+    main()

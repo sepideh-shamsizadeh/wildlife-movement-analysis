@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tool1-deployment
+  name: server-deployment
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: tool1
+      app: server
   template:
     metadata:
       labels:
-        app: tool1
+        app: server
     spec:
       containers:
-      - name: tool1
-        image: tool1:latest
+      - name: server
+        image: sepideh92sh/server:latest
         ports:
         - containerPort: 80
         resources:
