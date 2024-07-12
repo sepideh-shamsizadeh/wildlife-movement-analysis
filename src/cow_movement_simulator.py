@@ -2,19 +2,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class CowMovementSimulator:
-    def __init__(self, cow_id, field_width=600, field_height=200, time_step=0.25, total_time=3000, 
-                 mean_velocity=1.5, std_dev_velocity=0.1, gps_noise_level=1.0, 
-                 mean_turning_angle_10s=83.272, reference_lat=47.0, reference_lon=8.0):
+    def __init__(self, cow_id, field_width=600, field_height=200, time_step=1, total_time=3000, 
+                 gps_noise_level=1.0, reference_lat=47.0, reference_lon=8.0):
         self.cow_id = cow_id
         self.FIELD_WIDTH = field_width
         self.FIELD_HEIGHT = field_height
         self.TIME_STEP = time_step
         self.TOTAL_TIME = total_time
         self.NUM_POINTS = int(self.TOTAL_TIME / self.TIME_STEP)
-        self.mean_velocity = mean_velocity
-        self.std_dev_velocity = std_dev_velocity
+        
         self.gps_noise_level = gps_noise_level
-        self.mean_turning_angle_10s = mean_turning_angle_10s
+        
+        # Temporal scales based on the table
+        self.temporal_scales = {
+            '5s': {'speed': 0.336, 'turning_angle': 69.005},
+            '10s': {'speed': 0.281, 'turning_angle': 83.272},
+            '1min': {'speed': 0.164, 'turning_angle': 47.334},
+            '15min': {'speed': 0.107, 'turning_angle': 62.018},
+            '10min': {'speed': 0.115, 'turning_angle': 42.497},
+            '30min': {'speed': 0.125, 'turning_angle': 71.831},
+        }
         
         # Geographic conversion constants
         self.reference_lat = reference_lat
@@ -23,7 +30,8 @@ class CowMovementSimulator:
         self.meters_per_degree_lon = 111320 * np.cos(np.radians(reference_lat))
         
         # Initialize position
-        self.x, self.y = 600, 0  # Starting at the top-right corner of the field
+        self.x = np.random.uniform(0, self.FIELD_WIDTH)
+        self.y = np.random.uniform(0, self.FIELD_HEIGHT)
         self.trajectory = [(self.x, self.y)]
         self.speeds = []
 
@@ -43,26 +51,38 @@ class CowMovementSimulator:
         average_distance = np.mean(distances)
         return average_distance < threshold_distance
     
-    def calculate_median_speed(self, speeds, window_size):
-        if len(speeds) < window_size:
-            return np.median(speeds)
-        return np.median(speeds[-window_size:])
+    def get_temporal_scale(self, current_time):
+        if current_time < 60:
+            return '5s'
+        elif current_time < 600:
+            return '1min'
+        elif current_time < 1800:
+            return '15min'
+        elif current_time < 3600:
+            return '30min'
+        else:
+            return '30min'
     
     def next_step(self):
         stationary_check_interval = 300  # seconds
         window_size_stationary = int(stationary_check_interval / self.TIME_STEP)
         
+        current_time = len(self.trajectory) * self.TIME_STEP
+        scale = self.get_temporal_scale(current_time)
+        speed_mean = self.temporal_scales[scale]['speed']
+        turning_angle_mean = self.temporal_scales[scale]['turning_angle']
+        
         if not self.is_stationary(self.trajectory, window_size=window_size_stationary, threshold_distance=3):
-            behavior = np.random.choice(['grazing', 'walking', 'resting'], p=[0.7, 0.2, 0.1])
+            behavior = np.random.choice(['grazing', 'walking', 'resting'], p=[0.5, 0.4, 0.1])
             
             if behavior == 'grazing':
-                speed = np.random.normal(self.mean_velocity, self.std_dev_velocity)
+                speed = np.random.normal(speed_mean, speed_mean * 0.1)
             elif behavior == 'walking':
-                speed = np.random.normal(2.0, 0.2)
+                speed = np.random.normal(speed_mean * 2, speed_mean * 0.2)
             else:
                 speed = 0
             
-            angle = np.radians(np.random.normal(self.mean_turning_angle_10s, 30))
+            angle = np.radians(np.random.normal(turning_angle_mean, 30))
             self.x += speed * np.cos(angle) * self.TIME_STEP
             self.y += speed * np.sin(angle) * self.TIME_STEP
             self.x, self.y = self.add_gps_noise(self.x, self.y, self.gps_noise_level)
@@ -87,9 +107,6 @@ class CowMovementSimulator:
         plt.legend()
         plt.grid(True)
         plt.show()
-
-
-
 
 def main():
     # Create an instance of the CowMovementSimulator

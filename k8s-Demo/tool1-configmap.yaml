@@ -4,4 +4,4 @@ kind: ConfigMap
 metadata:
   name: tool1-config
 data:
-  NUM_ANIMALS: "5"
+  NUM_ANIMALS: "10"

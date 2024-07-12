@@ -30,8 +30,8 @@ class MovementGenerator:
             if trajectory:
                 lats, lons = zip(*trajectory)
                 x, y = self.convert_to_meters(lats, lons)
-                x = 600+x
-                y = 0+y
+                # x = 600+x
+                # y = 0+y
                 plt.plot(x, y, label=f'Cow {cow_id}')
         plt.title('Animal Movements Over Time')
         plt.xlabel('Distance (meters)')
