@@ -29,11 +29,14 @@ class CowMovementSimulator:
         self.meters_per_degree_lat = 111320
         self.meters_per_degree_lon = 111320 * np.cos(np.radians(reference_lat))
         
-        # Initialize position
-        self.x = np.random.uniform(0, self.FIELD_WIDTH)
-        self.y = np.random.uniform(0, self.FIELD_HEIGHT)
+        # Initialize position to (0, 0)
+        self.x = 0
+        self.y = 0
         self.trajectory = [(self.x, self.y)]
         self.speeds = []
+        
+        self.movement_duration = 0  # Track duration of continuous movement
+        self.angle = np.random.uniform(0, 2 * np.pi)  # Initialize direction angle randomly
 
     def add_gps_noise(self, x, y, noise_level):
         return x + np.random.normal(0, noise_level), y + np.random.normal(0, noise_level)
@@ -51,43 +54,51 @@ class CowMovementSimulator:
         average_distance = np.mean(distances)
         return average_distance < threshold_distance
     
-    def get_temporal_scale(self, current_time):
-        if current_time < 60:
+    def get_temporal_scale(self, duration):
+        if duration < 10:
             return '5s'
-        elif current_time < 600:
+        elif duration < 60:
+            return '10s'
+        elif duration < 900:
             return '1min'
-        elif current_time < 1800:
+        elif duration < 600:
             return '15min'
-        elif current_time < 3600:
-            return '30min'
+        elif duration < 1800:
+            return '10min'
         else:
             return '30min'
     
     def next_step(self):
-        stationary_check_interval = 300  # seconds
-        window_size_stationary = int(stationary_check_interval / self.TIME_STEP)
+        self.movement_duration += self.TIME_STEP
+        if self.movement_duration >= 2700:  # 45 minutes
+            self.movement_duration = 0
         
-        current_time = len(self.trajectory) * self.TIME_STEP
-        scale = self.get_temporal_scale(current_time)
+        scale = self.get_temporal_scale(self.movement_duration)
         speed_mean = self.temporal_scales[scale]['speed']
         turning_angle_mean = self.temporal_scales[scale]['turning_angle']
         
-        if not self.is_stationary(self.trajectory, window_size=window_size_stationary, threshold_distance=3):
-            behavior = np.random.choice(['grazing', 'walking', 'resting'], p=[0.5, 0.4, 0.1])
-            
-            if behavior == 'grazing':
-                speed = np.random.normal(speed_mean, speed_mean * 0.1)
-            elif behavior == 'walking':
-                speed = np.random.normal(speed_mean * 2, speed_mean * 0.2)
-            else:
-                speed = 0
-            
-            angle = np.radians(np.random.normal(turning_angle_mean, 30))
-            self.x += speed * np.cos(angle) * self.TIME_STEP
-            self.y += speed * np.sin(angle) * self.TIME_STEP
-            self.x, self.y = self.add_gps_noise(self.x, self.y, self.gps_noise_level)
-            self.speeds.append(speed)
+        behavior = np.random.choice(['grazing', 'walking'], p=[0.5, 0.5])
         
+        if behavior == 'grazing':
+            speed = np.random.normal(speed_mean, speed_mean * 0.1)
+        else:
+            speed = np.random.normal(speed_mean * 2, speed_mean * 0.2)
+        
+        # Update position with boundary checking
+        new_x = self.x + speed * np.cos(self.angle) * self.TIME_STEP
+        new_y = self.y + speed * np.sin(self.angle) * self.TIME_STEP
+        
+        if new_x < 0 or new_x > self.FIELD_WIDTH or new_y < 0 or new_y > self.FIELD_HEIGHT:
+            turn_angle = np.radians(np.random.uniform(90, 180))  # Random turn angle between 90 and 180 degrees
+            self.angle += turn_angle
+            new_x = self.x + speed * np.cos(self.angle) * self.TIME_STEP
+            new_y = self.y + speed * np.sin(self.angle) * self.TIME_STEP
+        
+        # Apply GPS noise
+        self.x, self.y = self.add_gps_noise(new_x, new_y, self.gps_noise_level)
+        self.speeds.append(speed)
+        
+        # Ensure the cow remains within bounds
         self.x = np.clip(self.x, 0, self.FIELD_WIDTH)
         self.y = np.clip(self.y, 0, self.FIELD_HEIGHT)
         
