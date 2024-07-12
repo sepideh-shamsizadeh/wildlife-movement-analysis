@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: tool1
 spec:
-  replicas: 1
+  replicas: 3  # Increase the number of replicas for load balancing
   selector:
     matchLabels:
       app: tool1
@@ -42,3 +42,22 @@ spec:
       port: 80
       targetPort: 5678
       nodePort: 30001  # Ensure this is within the NodePort range (30000-32767)
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tool1-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: tool1.example.com  # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tool1-service
+            port:
+              number: 80

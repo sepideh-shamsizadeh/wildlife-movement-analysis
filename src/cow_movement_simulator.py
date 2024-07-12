@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class CowMovementSimulator:
-    def __init__(self, cow_id, field_width=600, field_height=200, time_step=1, total_time=3000, 
+    def __init__(self, cow_id, field_width=600, field_height=200, time_step=1, total_time=18000, 
                  gps_noise_level=1.0, reference_lat=47.0, reference_lon=8.0):
         self.cow_id = cow_id
         self.FIELD_WIDTH = field_width
