@@ -50,4 +50,5 @@ async def main():
         calculate_metrics()
     )
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

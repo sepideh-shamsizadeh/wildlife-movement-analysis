@@ -18,6 +18,12 @@ spec:
         image: sepideh92sh/tool2:latest
         ports:
         - containerPort: 80
+        env:
+        - name: SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tool2-config
+              key: SERVER_URL
         resources:
           limits:
             cpu: "500m"

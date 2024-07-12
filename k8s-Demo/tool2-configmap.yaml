@@ -1,6 +1,7 @@
+# configmap-tool2.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: tool2-config
 data:
-  SERVER_URL: "ws://server-service:80"
+  SERVER_URL: "ws://tool1-service:80"

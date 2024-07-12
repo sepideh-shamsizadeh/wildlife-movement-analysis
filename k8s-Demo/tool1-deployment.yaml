@@ -17,7 +17,13 @@ spec:
       - name: tool1
         image: sepideh92sh/tool1:latest
         ports:
-        - containerPort: 8765
+        - containerPort: 5678
+        env:
+        - name: NUM_ANIMALS
+          valueFrom:
+            configMapKeyRef:
+              name: tool1-config
+              key: NUM_ANIMALS
         resources:
           limits:
             cpu: "500m"
@@ -34,4 +40,4 @@ spec:
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 8765
+      targetPort: 5678
