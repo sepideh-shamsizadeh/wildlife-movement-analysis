@@ -1,7 +1,3 @@
-Sure, here is the improved README without including the example Kubernetes YAML files directly, but still providing the necessary instructions for using them:
-
----
-
 # Wildlife Movement Analysis
 
 Animal Behavior Tracker monitors wildlife and livestock using distributed IoT data acquisition. It generates simulated animal movements, streams data, calculates metrics, and deploys on Kubernetes. Features include real-time location updates, anomaly detection, and scalable performance analysis.
