@@ -7,9 +7,12 @@ import torch
 import torch.nn as nn
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+import pickle
+import pandas as pd
 
 animal_positions = {}
 model_path = 'lstm_autoencoder.pth'
+scaler_path = 'scaler.pkl'
 seq_length = 10
 hidden_dim = 50
 latent_dim = 10
@@ -39,12 +42,18 @@ def load_model(model_path):
     model.eval()
     return model
 
+def load_scaler(scaler_path):
+    with open(scaler_path, 'rb') as f:
+        scaler = pickle.load(f)
+    return scaler
+
 model = load_model(model_path)
-scaler = MinMaxScaler()
+scaler = load_scaler(scaler_path)
 
 def preprocess_positions(positions):
-    scaled_positions = scaler.fit_transform(positions)
-    sequences = [scaled_positions[i:i + seq_length] for i in range(len(scaled_positions) - seq_length)]
+    positions_df = pd.DataFrame(positions, columns=['latitude', 'longitude'])
+    scaled_positions = scaler.transform(positions_df)
+    sequences = np.array([scaled_positions[i:i + seq_length] for i in range(len(scaled_positions) - seq_length)])
     return torch.tensor(sequences, dtype=torch.float32), scaled_positions
 
 def haversine(coord1, coord2):
@@ -91,7 +100,8 @@ async def retrain_model():
             positions_tensor, _ = preprocess_positions(all_positions)
             print("Retraining model with new data...")
             train_model(model, positions_tensor)
-            print("Model retrained with new data")
+            torch.save(model.state_dict(), model_path)
+            print("Model retrained with new data and saved")
 
 def train_model(model, positions_tensor, num_epochs=5, learning_rate=0.001):
     criterion = nn.MSELoss()

@@ -4,15 +4,23 @@ import json
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from cow_movement_simulator import CowMovementSimulator
+from cow_movement_simulator import CowMovementSimulator  # Ensure this import is correct
 
 class MovementGenerator:
     def __init__(self, num_animals):
         self.simulators = [CowMovementSimulator(cow_id) for cow_id in range(num_animals)]
         self.trajectories = {simulator.cow_id: [] for simulator in self.simulators}
+        self.connections = set()
 
-    async def send_movements(self, websocket, path):
+    async def register(self, websocket):
+        self.connections.add(websocket)
+
+    async def unregister(self, websocket):
+        self.connections.remove(websocket)
+
+    async def send_movements(self):
         while True:
+            data_batch = []
             for simulator in self.simulators:
                 cow_id, lat, lon = simulator.next_step()
                 self.trajectories[cow_id].append((lat, lon))
@@ -21,8 +29,21 @@ class MovementGenerator:
                     "latitude": lat,
                     "longitude": lon
                 }
-                await websocket.send(json.dumps(data))
+                data_batch.append(json.dumps(data))
+
+            if self.connections:
+                # Send data to all connected clients
+                await asyncio.wait([ws.send(data) for data in data_batch for ws in self.connections])
+
             await asyncio.sleep(simulator.TIME_STEP)  # Sleep for the time step duration
+
+    async def handler(self, websocket, path):
+        # Register new connection
+        await self.register(websocket)
+        try:
+            await websocket.wait_closed()
+        finally:
+            await self.unregister(websocket)
 
     def plot_trajectories(self):
         plt.figure(figsize=(14, 8))
@@ -30,8 +51,6 @@ class MovementGenerator:
             if trajectory:
                 lats, lons = zip(*trajectory)
                 x, y = self.convert_to_meters(lats, lons)
-                # x = 600+x
-                # y = 0+y
                 plt.plot(x, y, label=f'Cow {cow_id}')
         plt.title('Animal Movements Over Time')
         plt.xlabel('Distance (meters)')
@@ -56,7 +75,10 @@ class MovementGenerator:
 def main():
     num_animals = int(os.getenv("NUM_ANIMALS", 5))  # Default to 5 if the environment variable is not set
     generator = MovementGenerator(num_animals)
-    start_server = websockets.serve(generator.send_movements, "0.0.0.0", 5678)
+    start_server = websockets.serve(generator.handler, "0.0.0.0", 5678)
+
+    # Run the movement data generator in the background
+    asyncio.get_event_loop().create_task(generator.send_movements())
 
     try:
         asyncio.get_event_loop().run_until_complete(start_server)

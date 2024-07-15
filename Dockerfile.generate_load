@@ -1,0 +1,9 @@
+FROM alpine:latest
+
+RUN apk add --no-cache websocat
+
+# Add the load generation script
+COPY load_generator.sh /load_generator.sh
+RUN chmod +x /load_generator.sh
+
+CMD ["/load_generator.sh"]

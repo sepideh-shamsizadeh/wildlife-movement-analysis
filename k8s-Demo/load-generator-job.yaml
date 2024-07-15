@@ -1,0 +1,12 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: load-generator
+spec:
+  template:
+    spec:
+      containers:
+      - name: load-generator
+        image: sepideh92sh/load-generator:latest
+      restartPolicy: Never
+  backoffLimit: 4

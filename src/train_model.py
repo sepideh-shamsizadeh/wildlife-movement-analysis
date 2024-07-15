@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, random_split
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_squared_error, precision_recall_fscore_support
+import pickle
 
 # Load and visualize historical data
 def load_historical_data(filename):
@@ -62,7 +62,7 @@ class LSTMAutoencoder(nn.Module):
         return out
 
 # Train the autoencoder
-def train_model(model, train_loader, num_epochs=20, learning_rate=0.001):
+def train_model(model, train_loader, val_loader, num_epochs=20, learning_rate=0.001):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     model.train()
@@ -75,10 +75,22 @@ def train_model(model, train_loader, num_epochs=20, learning_rate=0.001):
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
-        print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss / len(train_loader):.4f}')
+        val_loss = evaluate_model(model, val_loader, criterion)
+        print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss / len(train_loader):.4f}, Val Loss: {val_loss:.4f}')
+
+# Evaluate the autoencoder on validation data
+def evaluate_model(model, val_loader, criterion):
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for x, y in val_loader:
+            output = model(x)
+            loss = criterion(output, y[:, -1, :])
+            val_loss += loss.item()
+    return val_loss / len(val_loader)
 
 # Detect anomalies
-def detect_anomalies(model, data_loader, scaler, threshold=0.01):
+def detect_anomalies(model, data_loader, scaler, threshold):
     model.eval()
     anomalies = []
     reconstruction_errors = []
@@ -107,9 +119,12 @@ def plot_results(data, anomalies, scaler):
     plt.legend()
     plt.show()
 
-# Save the trained model
-def save_model(model, filename):
-    torch.save(model.state_dict(), filename)
+# Save the trained model and scaler
+def save_model(model, model_filename, scaler, scaler_filename):
+    torch.save(model.state_dict(), model_filename)
+    with open(scaler_filename, 'wb') as f:
+        pickle.dump(scaler, f)
+    print(f"Model saved to {model_filename} and scaler saved to {scaler_filename}")
 
 # Main function
 def main():
@@ -126,25 +141,30 @@ def main():
     num_epochs = 20
 
     dataset = MovementDataset(data, seq_length)
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     model = LSTMAutoencoder(seq_length, input_dim, hidden_dim, latent_dim)
-    train_model(model, data_loader, num_epochs, learning_rate)
+    train_model(model, train_loader, val_loader, num_epochs, learning_rate)
 
-    # Detect anomalies
-    anomalies, reconstruction_errors = detect_anomalies(model, data_loader, dataset.scaler)
+    # Detect anomalies on the validation set
+    anomalies, reconstruction_errors = detect_anomalies(model, val_loader, dataset.scaler, threshold=0.01)
     threshold = determine_threshold(reconstruction_errors)
-    anomalies, _ = detect_anomalies(model, data_loader, dataset.scaler, threshold)
+    anomalies, _ = detect_anomalies(model, val_loader, dataset.scaler, threshold)
     
     print(f"Anomalies detected: {sum(anomalies)}")
 
     # Plot results
     plot_results(data, anomalies, dataset.scaler)
 
-    # Save the model
+    # Save the model and scaler
     model_filename = 'lstm_autoencoder.pth'
-    save_model(model, model_filename)
-    print(f"Model saved to {model_filename}")
+    scaler_filename = 'scaler.pkl'
+    save_model(model, model_filename, dataset.scaler, scaler_filename)
 
 if __name__ == "__main__":
     main()
