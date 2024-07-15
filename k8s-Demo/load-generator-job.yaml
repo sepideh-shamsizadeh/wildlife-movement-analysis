@@ -4,9 +4,19 @@ metadata:
   name: load-generator
 spec:
   template:
+    metadata:
+      name: load-generator
     spec:
       containers:
       - name: load-generator
         image: sepideh92sh/load-generator:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        env:
+        - name: SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tool2-config
+              key: SERVER_URL
       restartPolicy: Never
-  backoffLimit: 4

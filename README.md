@@ -178,6 +178,12 @@ To simulate load on `tool1`, run the load generator job:
     kubectl apply -f load-generator-job.yaml
     ```
 
+or 
+
+    ```sh
+    sh load_generator.sh
+    ```
+    
 This job will create multiple WebSocket connections to `tool1` to simulate load and trigger the autoscaling mechanisms.
 
 ### Verifying the Deployment

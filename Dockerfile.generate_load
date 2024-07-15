@@ -1,9 +1,29 @@
-FROM alpine:latest
+# Use a lightweight base image with Python
+FROM python:3.9-slim
 
-RUN apk add --no-cache websocat
+# Set the working directory in the container
+WORKDIR /app
 
-# Add the load generation script
+# Copy the requirements file into the container
+COPY requirements.txt ./
+
+# Install the required Python packages
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download and install websocat
+RUN apt-get update && apt-get install -y curl && \
+    curl -L https://github.com/vi/websocat/releases/download/v1.8.0/websocat_amd64-linux -o /usr/local/bin/websocat && \
+    chmod +x /usr/local/bin/websocat
+
+# Verify installation of websocat
+RUN ls -l /usr/local/bin/websocat
+RUN /usr/local/bin/websocat --version
+
+# Copy the load generator script into the container
 COPY load_generator.sh /load_generator.sh
+
+# Make the script executable
 RUN chmod +x /load_generator.sh
 
-CMD ["/load_generator.sh"]
+# Set the entrypoint to the script
+ENTRYPOINT ["/load_generator.sh"]
