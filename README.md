@@ -66,6 +66,7 @@ You can pull these images directly or build them yourself.
 To pull the Docker images from Docker Hub:
 
 ```sh
+minikube ssh
 docker pull sepideh92sh/tool1:latest
 docker pull sepideh92sh/tool2:latest
 ```
