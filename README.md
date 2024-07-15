@@ -1,6 +1,8 @@
 # Wildlife Movement Analysis
 
 Animal Behavior Tracker monitors wildlife and livestock using distributed IoT data acquisition. It generates simulated animal movements, streams data, calculates metrics, and deploys on Kubernetes. Features include real-time location updates, anomaly detection, and scalable performance analysis.
+![Figure_2](https://github.com/user-attachments/assets/c92796e7-5f0b-444e-855a-1eb118154cbb)
+
 
 ## Getting Started
 
@@ -266,10 +268,6 @@ This section provides a step-by-step guide to installing Helm, Prometheus, and G
 - `requirements.txt`: Lists the Python dependencies needed for the project.
 - `tests/`: Contains test scripts for the project.
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ### Kubernetes Deployment YAML Files
 
 The Kubernetes YAML files needed for deployment are located in the `wildlife-movement-analysis/k8s-Demo` directory. These files include:
@@ -298,3 +296,6 @@ kubectl apply -f load-generator-job.yaml
 
 This will set up and deploy the applications on your Kubernetes cluster.
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
