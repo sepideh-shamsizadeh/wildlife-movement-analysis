@@ -61,6 +61,20 @@ The Docker images for `tool1` and `tool2` are available on Docker Hub:
 
 You can pull these images directly or build them yourself.
 
+### Starting Minikube
+
+1. **Start Minikube:**
+
+    ```sh
+    minikube start
+    ```
+
+2. **Set Docker environment to use Minikube's Docker daemon:**
+
+    ```sh
+    eval $(minikube docker-env)
+    ```
+
 ### Pulling Docker Images
 
 To pull the Docker images from Docker Hub:
@@ -109,19 +123,6 @@ To deploy `tool1` and `tool2` on Kubernetes, you will need to use the provided K
 
 Ensure you have `kubectl` installed and configured to communicate with your Kubernetes cluster.
 
-### Starting Minikube
-
-1. **Start Minikube:**
-
-    ```sh
-    minikube start
-    ```
-
-2. **Set Docker environment to use Minikube's Docker daemon:**
-
-    ```sh
-    eval $(minikube docker-env)
-    ```
 
 ### Deploying `tool1` and `tool2` on Kubernetes
 
