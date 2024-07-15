@@ -77,12 +77,8 @@ class CowMovementSimulator:
         speed_mean = self.temporal_scales[scale]['speed']
         turning_angle_mean = self.temporal_scales[scale]['turning_angle']
         
-        behavior = np.random.choice(['grazing', 'walking'], p=[0.5, 0.5])
-        
-        if behavior == 'grazing':
-            speed = np.random.normal(speed_mean, speed_mean * 0.1)
-        else:
-            speed = np.random.normal(speed_mean * 2, speed_mean * 0.2)
+        # Only consider walking behavior
+        speed = np.random.normal(speed_mean, speed_mean * 0.1)
         
         # Update position with boundary checking
         new_x = self.x + speed * np.cos(self.angle) * self.TIME_STEP

@@ -15,14 +15,16 @@ async def consume_and_save_data(server_url, output_file):
                 data = json.loads(message)
                 animal_id = data['cow_id']
                 position = (data['latitude'], data['longitude'])
+                timestamp = datetime.now().isoformat()
                 if animal_id not in animal_positions:
                     animal_positions[animal_id] = []
-                animal_positions[animal_id].append(position)
+                animal_positions[animal_id].append((timestamp, position))
 
     async def save_positions_periodically():
         while True:
             await asyncio.sleep(60)  # Save data every 60 seconds
             save_positions(output_file, animal_positions)
+            animal_positions.clear()  # Clear saved positions to avoid duplicates
 
     await asyncio.gather(
         consume_movement_data(),
@@ -31,12 +33,13 @@ async def consume_and_save_data(server_url, output_file):
 
 # Function to save positions to CSV
 def save_positions(filename, animal_positions):
-    with open(filename, mode='w', newline='') as file:
+    file_exists = os.path.isfile(filename)
+    with open(filename, mode='a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['timestamp', 'cow_id', 'latitude', 'longitude'])
-        timestamp = datetime.now().isoformat()
+        if not file_exists or os.path.getsize(filename) == 0:
+            writer.writerow(['timestamp', 'cow_id', 'latitude', 'longitude'])
         for animal_id, positions in animal_positions.items():
-            for lat, lon in positions:
+            for timestamp, (lat, lon) in positions:
                 writer.writerow([timestamp, animal_id, lat, lon])
 
 # Main function to start the process
