@@ -123,7 +123,6 @@ To deploy `tool1` and `tool2` on Kubernetes, you will need to use the provided K
 
 Ensure you have `kubectl` installed and configured to communicate with your Kubernetes cluster.
 
-
 ### Deploying `tool1` and `tool2` on Kubernetes
 
 1. **Navigate to the Kubernetes directory:**
@@ -178,12 +177,12 @@ To simulate load on `tool1`, run the load generator job:
     kubectl apply -f load-generator-job.yaml
     ```
 
-or 
+    or 
 
     ```sh
     sh load_generator.sh
     ```
-    
+
 This job will create multiple WebSocket connections to `tool1` to simulate load and trigger the autoscaling mechanisms.
 
 ### Verifying the Deployment
@@ -260,7 +259,6 @@ To deploy monitoring tools such as Prometheus and Grafana, follow these steps:
 
 This section provides a step-by-step guide to installing Helm, Prometheus, and Grafana, ensuring your Kubernetes cluster is properly monitored.
 
-
 ## Additional Resources
 
 - `historical_data.csv`: Contains historical data used for training models.
@@ -271,8 +269,6 @@ This section provides a step-by-step guide to installing Helm, Prometheus, and G
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
 
 ### Kubernetes Deployment YAML Files
 
@@ -301,3 +297,4 @@ kubectl apply -f load-generator-job.yaml
 ```
 
 This will set up and deploy the applications on your Kubernetes cluster.
+
